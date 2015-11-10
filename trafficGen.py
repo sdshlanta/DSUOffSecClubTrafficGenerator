@@ -1,600 +1,483 @@
-import smtplib
-import imaplib
-import time
+#Python traffic generator by YoNotHim
+ 
+#takes the xml output of an nmap scan filename is set with input file.
+#trys to connect to any common network services it is given by the nmap report
+#makes a looooot of threads so if that is a problem for you keep that in mind
+#may add support for masscan at some point but mehs
+
+
+from libnmap.parser import NmapParser #for parsing nmap for generating the host list
+from datetime import datetime
+from bs4 import BeautifulSoup # for parsing the receved html for the spider because im lazy
+from pydhcplib.dhcp_packet import * # for DHCP
+from pydhcplib.dhcp_network import * # for DHCP
+from ftplib import FTP #for FTP
+from email.mime.text import MIMEText
+#import json #for parsing mascan use the -oJ <filename> to generate the output file
+import socket #for generic requests
+import telnetlib #telnet
+import paramiko, base64 #SSH
+import requests #for HTTP
+import smtplib, imaplib, poplib #for SMTP IMAP and POP3, basicly all email
+import tftpy #for TFTP
+import dns.resolver as dnsResolver # for DNS
+import pysftp # for SFTP
 import threading
-import sys
-import argparse
-import csv
-import random
-import string
-import email
-import re
-import math
-import pickle
+import random, string
+import time
+import email.utils
+
+#actual globaly scoped varables
+hostlist = []
+TheEndOfTime = False
+
+#config
+atemptFilteredAndClosedConnections = False
+inputFile = "test.xml"
+debug = True
+delayFactor = 30 #the value time is modded by
+maxLinksFollowed = 3
 
 
-keys = []
 
-class autoSave(object):
-	"""docstring for autoSave"""
+def get_urls_from_response(r):
+	soup = BeautifulSoup(r.text, 'html.parser')
+	urls = [link.get('href') for link in soup.find_all('a')]
+	return urls
+
+def print_url(args):
+	print args['url']
+
+def randomword(length=6):
+	return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
+
+def rand():
+	return random.SystemRandom().random()*1000000000000000000 # ignore the magic number
+
+def delay(addtionalDelay=0):
+	time.sleep((int(rand())%delayFactor)+addtionalDelay)
+
+class Client(DhcpClient):
+	"""implmented for the dhcp client"""
+	def __init__(self, options):
+		DhcpClient.__init__(self,options["listen_address"],
+							options["client_listen_port"],
+							options["server_listen_port"])
+		
+	def HandleDhcpOffer(self, packet):
+		print packet.str()
+	def HandleDhcpAck(self, packet):
+		print packet.str()
+	def HandleDhcpNack(self, packet):
+		print packet.str()  
+
+class telnet(object):
+	"""docstring for telnet"""
 	def __init__(self):
-		super(autoSave, self).__init__()
-	def run(self):
-		t = threading.Thread(target=self.save)
-		t.setDaemon(True)
+		super(telnet, self).__init__()
+	def run(self, ipaddr, port=23):
+		self.arguments = (port, ipaddr)
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
-	def save(self):
-		while 1:
+	def open(self, ipaddr, port):
+		while not TheEndOfTime:
 			try:
-				fp=open("backup.dat", 'wb')
-				pickle.dump(playerManager,fp)
+				tn = telnetlib.Telnet(ipaddr, port)
+
+				tn.read_until("login: ")
+				tn.write("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n") #type some random junk for the username
+				if password:
+					tn.read_until("Password: ")
+					tn.write(randomword() + "DontBanPlx\n") #type some random junk for the password
+
+				#these should never ever ever execute but if the do it does an ls and exits
+				tn.write("ls\n")
+				delay(-1)
+				tn.write("exit\n")
+				delay(-1)
 			except Exception, e:
-				print "Auto-save failed."
-			time.sleep(60)
+				if debug:
+					print e
+			delay()
 
 
-#finished
-class menu(object):
-	"""docstring for menu"""
-	def __init__(self, game,messenger):
-		super(menu, self).__init__()
-		self.game=game
-		self.messenger=messenger
-		saver = autoSave()
-		saver.run()
-		try:
-			while 1:
-				selection = raw_input("\033c\nMain menu:\n1.) Make a player a zombie\n2.) Make a player human\n3.) Change PZ\n4.) Get a list of players.\n5.) Get a list of zombies.\n6.) Get a list of humans.\n7.) Fetch pID from a name\n8.) Send out a mission.\n9.) Perform a manual backup\n0.) End game (there will be a conformation dialogue).\n-> ")
-				selection = selection.rstrip()
-				if selection == '1':
-					self.setAllegiance(True, 'Zombie')
-				elif selection == '2':
-					self.setAllegiance(False, 'Human')
-				elif selection == '3':
-					self.setPZ()
-				elif selection == '4':
-					self.playerList()
-				elif selection == '5':
-					self.zombieList()
-				elif selection == '6':
-					self.humanList()
-				elif selection == '7':
-					self.getpIDFromName()
-				elif selection == '8':
-					self.mission()
-				elif selection == '9':
-					self.manualBackup()
-				elif selection == '0':
-					self.endGame()
-				else:
-					print "Invalid choice: \"%s\"\n<---Press Enter to continue--->" % selection
-					raw_input()
+class ftp(object):
+	"""docstring for ftp"""
+	def __init__(self):
+		super(ftp, self).__init__()
+	def run(self, ipaddr, port=21):
+		t = threading.Thread(target=self.open, args=(port, ipaddr))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		while not TheEndOfTime:
+			try:
+				ftpClient = FTP()
+				ftpClient.connect(ipaddr, port)
+				ftpClient.login() #anon login
+				ftpClient.retrlines('list') #do a thing
+				ftp.quit() #gtfo
+			except Exception, e:
+				if debug:
+					print e
+			delay()
 
+class sftp(object):
+	"""docstring for sftp"""
+	def __init__(self):
+		super(sftp, self).__init__()
+	def run(self, ipaddr, port=115):
+		t = threading.Thread(target=self.open, args=(port, ipaddr))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+
+		while not TheEndOfTime:
+			try:
+				connection = pysftp.Connection(ipaddr, port, username='notABruteForce'+randomword(), password='seriouslyThisIsLegit' + randomword())
+				connection.close()
+			except Exception, e:
+				if debug:
+					print e
+			delay()
+		
+class tftp(object):
+	"""docstring for tftp"""
+	def __init__(self):
+		super(tftp, self).__init__()
+	def run(self, ipaddr, port=69):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		print "tftp"
+		while not TheEndOfTime:
+			try:
+				client = tftpy.TftpClient(ipaddr, port)
+				tftpFileName = 'tftp.tmp'
+				fp = file(tftpFileName, 'w')
+				fp.write(randomword(256))
+				client.upload(tftpFileName, tftpFileName)
+				client.download('exists', 'downloaded.dat')
+			except Exception, e:
+				if debug:
+					raise e
+			delay()
 						
-		except Exception, e:
-			pass
-		
-	
-	def setAllegiance(self, side, usrHlp):
-		print "\033cSet Allegiance: %s\n%s" % (usrHlp, args.f)
-		self.pID = raw_input("pID-> ")
-		self.pID = self.pID.rstrip()
-		if self.pID in set(keys):
-			playerManager.pDict[self.pID].zombie = side
-		elif self.pID == "exit":
-			raw_input("No allegiances have been changed\n<---Press Enter to continue--->")
-		else:
-			self.setAllegiance(side, usrHlp + ": Incorrect pID")
+class http(object):
+	"""docstring for http"""
+	def __init__(self):
+		super(http, self).__init__()
+		self.depth = 0
+	def run(self, ipaddr, port=80):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t	
 
-	def setPZ(self):
-		print "\033cSet PZ:"
-		self.selection = raw_input("Would you like to keep the current PZ(s)? (Y/N)\n-> ")
-		thingSet = False
-		if self.selection.lower() == 'y':
-			self.selection = raw_input("\033cSet PZ:\npID-> ")
-			while not thingSet:
-				if self.selection.rstrip() in set(keys):
-					playerManager.pDict[self.selection].PZero = True
-					thingSet = True
-				elif self.selection.rstrip() == 'exit':
-					thingSet = True
-					raw_input("Old PZ(s) kept\n<---Press Enter to continue--->")
-				else:
-					self.selection = raw_input("pID not found.\npID-> ")
-		elif self.selection.lower() == 'n':
-			self.selection = raw_input("\033cSet PZ:\npID-> ")
-			while not thingSet:
-				if self.selection.rstrip() in set(keys):
-					for key in keys:
-						if playerManager.pDict[key].PZero:
-							playerManager.pDict[key].PZero = False
-					playerManager.pDict[self.selection].PZero = True
-					thingSet = True
-				elif self.selection.rstrip() == 'exit':
-					thingSet = True
-					raw_input("Old PZ(s) kept\n<---Press Enter to continue--->")
-				else:
-					self.selection = raw_input("pID not found.\npID-> ")
-		elif self.selection.rstrip() == 'exit':
-			return
-		else:
-			raw_input("Invalid choice.\n<---Press Enter to continue--->")
-	
-	def playerList(self):
-		print "\033cList of players:\nName\t\t| pID\t| Zombie | Kills | Is PZ"
-		for key in keys:
-			if playerManager.pDict[key].PZero:
-				print "%s\t| %s | %s\t | %s\t | %s" % (playerManager.pDict[key].name,key,playerManager.pDict[key].zombie,playerManager.pDict[key].kills,playerManager.pDict[key].PZero)
-			else:
-				print "%s\t| %s | %s\t | %s\t |" % (playerManager.pDict[key].name,key,playerManager.pDict[key].zombie, playerManager.pDict[key].kills)
-		raw_input("<---Press Enter to continue--->")
-	
-	def humanList(self):
-		print "\033cList of humans:\nName\t\t| pID\t| Is PZ"
-		for key in keys:
-			if not playerManager.pDict[key].zombie and playerManager.pDict[key].PZero:
-				print "%s\t| %s\t| %s" % (playerManager.pDict[key].name,key,playerManager.pDict[key].PZero)
-			elif not playerManager.pDict[key].zombie:
-				print "%s\t| %s\t|" % (playerManager.pDict[key].name,key)
-		raw_input("<---Press Enter to continue--->")
-
-	def zombieList(self):
-		print "\033cList of zombies:\nName\t\t| pID\t| Kills\t| Was PZ"
-		for key in keys:
-			if playerManager.pDict[key].zombie and playerManager.pDict[key].PZero:
-				print "%s\t| %s\t| %s\t| %s" % (playerManager.pDict[key].name,key,playerManager.pDict[key].kills,playerManager.pDict[key].PZero)
-			elif playerManager.pDict[key].zombie:
-				print "%s\t| %s\t| %s\t|" % (playerManager.pDict[key].name,key,playerManager.pDict[key].kills)
-		raw_input("<---Press Enter to continue--->")
-
-	def getpIDFromName(self):
-		name = raw_input("\033cName to pID:\nEnter name: -> ")
-		print "Name\t\t| pID\t| Is PZ"
-		for key in keys:
-			if name.lower() in playerManager.pDict[key].name.lower():
-				if playerManager.pDict[key].PZero:
-					print "%s\t| %s\t| %s" % (playerManager.pDict[key].name,key,playerManager.pDict[key].PZero)
-				else:
-					print "%s\t| %s\t|" % (playerManager.pDict[key].name,key)
-		raw_input("<---Press Enter to continue--->")
-
-	def mission(self):
-		self.unsuccessful = True
-		self.msg = ""
-
-		self.path = raw_input("\033cMission Creation dialogue: Humans\nPlease enter the full path the the text file containing the human mission text.\n(example: C:\\Users\\Jon\\ Doe\\Documents\\HvZ\\humanMission.txt)\n-> ")
-		while self.unsuccessful:
+	def open(self, ipaddr, port): #this also spiders the site
+		print 'http'
+		while not TheEndOfTime:
 			try:
-				if self.path.rstrip() == 'exit':
-					return
-				self.fp = open(self.path.rstrip(), 'r')
-				self.msg = self.fp.read()
-				self.unsuccessful = False
+				url = 'http://' + str(ipaddr)
+				r=requests.get(url, verify=False)
+
+				while True:
+					links = get_urls_from_response(r)
+					if len(links) == 0 or self.depth <= maxLinksFollowed:
+						break
+					r= requests.get(random.choice(set(links)))
+					delay(2)
+					self.depth += 1
 			except Exception, e:
-				self.path = raw_input("\033cMission Creation dialogue: Human\nPlease enter the full path the the text file containing the human mission text.\n(example: C:\\Users\\Jon Doe\\Documents\\HvZ\\humanMission.txt)\nFILE DOES NOT EXIST.\n-> ")
-		print "\nMessaging humans..."
-		print self.messenger.emailHumans(self.msg)
-		self.messenger.emailHumans(self.msg)
-		self.messenger.sendHumans("Humans, new mission!\nCheck email your for details.")
-		
-		self.path = raw_input("\033cMission Creation dialogue: Zombies\nPlease enter the full path the the text file containing the zombie mission text.\n(example: C:\\Users\\Jon\\ Doe\\Documents\\HvZ\\humanMission.txt)\n-> ")
-		while self.unsuccessful:
-			try:
-				if self.path.rstrip() == 'exit':
-					return
-				self.fp = open(self.path.rstrip, 'r')
-				self.msg = self.fp.read()
-				self.unsuccessful = False
-			except Exception, e:
-				self.path = raw_input("\033cMission Creation dialogue: Zombies\nPlease enter the full path the the text file containing the zombie mission text.\n(example: C:\\Users\\Jon Doe\\Documents\\HvZ\\humanMission.txt)\nFILE DOES NOT EXIST.\n-> ")
-				self.unsuccessful = True
-		print "\nMessaging zombies"
-		self.messenger.emailZombies(self.msg)
-		self.messenger.sendPIDs(keys, "Players, new mission!\nCheck your email for details.")
+				if debug:
+					print str(ipaddr) + ':' + str(port)
+					print e
+			delay()
 
-	def manualBackup(self):
-		try:
-			fp=open("backup.dat", 'wb')
-			pickle.dump(playerManager,fp)
-			raw_input("Backup successful!\n<---Press Enter to continue--->")
-
-		except Exception, e:
-			raw_input("Backup UNsuccessful!\n<---Press Enter to continue--->")
-		
-
-	def endGame(self):
-		print "\033c"
-		sel = raw_input("To exit type the following sentence\n\'The quick brown fox jumps over the lazy dog.'\n(WARNING: This WILL end the game and you WILL lose all unsaved data.)\n-> ")
-		if sel.rstrip().lower() == 'the quick brown fox jumps over the lazy dog.':
-			sys.exit()
-
-
-class gameLogic(object):
-	"""docstring for gameLogic"""
-	def __init__(self, playerManager, mailMan, messenger):
-		super(gameLogic, self).__init__()
-		self.mailMan = mailMan
-		self.messenger = messenger
-		self.unknownCommand = "UnknownCommand: "
-
-	def run(self):
-		t = threading.Thread(target=self.logic)
-		t.setDaemon(True)
+class https(object):
+	"""docstring for https"""
+	def __init__(self):
+		super(https, self).__init__()
+		self.depth = 0
+	def run(self, ipaddr, port=443):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	def open(self, ipaddr, port):
+		print 'https'
+		while not TheEndOfTime:
+			try:
+				url = 'https://' + str(ipaddr)
+				r=requests.get(url, verify=True)
 
-	def logic(self):
-		while 1:
-			dif=0
-			self.unreadMail = self.mailMan.getUnread()
-			if self.unreadMail != None:
-				try:
-					for self.mail in self.unreadMail:
-						processedMessage = re.split('tagged *', self.mail[1], flags=re.I)
-						if processedMessage[0] != self.mail[1]:
-							if playerManager.makeZombie( str(processedMessage[1][:5]) ) == False:
-								self.messenger.sendSingle(self.mail[0], "\nPlayer doesn't exist, double check pID")
-							else:
-								for key in keys:
-									if self.mail[0] == playerManager.pDict[key].number:
-										self.messenger.sendSingle(self.mail[0], "\nTag confirmed.")
-										playerManager.pDict[key].kills+=1
-										playerManager.pDict[str(processedMessage[1][:5])].activeCooldown = time.time()
-
-						else:
-							processedMessage = re.split('help *', self.mail[1], flags=re.I)
-							if len(processedMessage) > 1:
-								if re.match('mission|tcb|kennedy center|science center|lowry|east|lowry hall|libary|kennedy|tunheim classroom buliding|beadle', processedMessage[1], flags=re.I)!=None:
-									if processedMessage[0] != self.mail[1]:
-										for key in keys:
-											if self.mail[0] == playerManager.pDict[key].number:
-												dif = time.time() - playerManager.pDict[key].activeCooldown
-									
-										if dif >3599:
-											helpers = []
-											count = 0
-											watchdog = 0
-											maxHelpers = range(int(math.ceil(float(len(keys))/float(3))))
-											#gets the people who will help the player.
-
-											while count <= maxHelpers and watchdog <=len(keys)*2:
-												candidate = random.choice(keys)
-												#print candidate
-												if playerManager.pDict[candidate].number != self.mail[0]:
-													if not playerManager.pDict[candidate].zombie:
-														if candidate not in set(helpers):
-															helpers.append(candidate)
-															#print "helpers: %s" % helpers
-															count += 1
-												watchdog += 1
-											msg = "\nSomeone nees help at " + processedMessage[1]
-											self.messenger.sendPIDs(helpers, msg)
-											self.messenger.sendSingle(self.mail[0], "\nRequest for help receved and forwarded")
-
-											#sets the cooldown
-											playerManager.pDict[key].activeCooldown = time.time()
-										else:
-											self.messenger.sendSingle(self.mail[0], "\nYour ablity to call for help is on cooldown.\nCooldown lasts for one hour after you used it. ")
-									else:
-										self.messenger.sendSingle(self.mail[0],"\n")
-							
-							else:
-								key = ""
-								for key in keys:
-									if self.mail[0] == playerManager.pDict[key].number:
-										dif = time.time() - playerManager.pDict[key].activeCooldown
-										break
-									elif playerManager.pDict[key].PZero:
-										dif = 3600
-										break
-								if dif > 3599:
-									processedMessage = re.split('siege *', self.mail[1], flags=re.I)
-
-									if processedMessage[0] != self.mail[1]:
-										if playerManager.pDict[key].PZero or playerManager.pDict[key].zombie:
-											if	re.match('tcb|kennedy center|east|science center|lowry|lowry hall|libary|kennedy|tunheim classroom buliding|beadle',processedMessage[1], flags=re.I)!=None:
-												self.messenger.sendZombies("\nSiege " + processedMessage[1])
-												playerManager.pDict[key].activeCooldown= time.time()
-
-											elif re.match('mission*|tcb.*|kennedy center.*|science center.*|lowry.*|east.*|lowry hall|libary|kennedy|tunheim classroom buliding|beadle', processedMessage[1], flags=re.I)!=None:
-												self.messenger.sendZombies("\nSiege " + processedMessage[1][-5:] + "at" + processedMessage[1][:-5]+".")
-												playerManager.pDict[key].activeCooldown= time.time()
-											else:
-												self.messenger.sendSingle(self.mail[0],"Malformed siege command")
-										else:
-											self.messenger.sendSingle(self.mail[0], "Sieges can only be initated by PZ or zombies.")
-									else:
-										self.messenger.sendSingle(self.mail[0], "\nUnknown command, please try again.")
-								else:
-									self.messenger.sendSingle(self.mail[0], "\nYour ablity to call for seiges is on cooldown for another "+ dif)
-				except Exception, e:
-					pass
-				#to make sure we don't get kicked off for making too many requests to fast.
-				time.sleep(1)
-
-
-class mailMan(object):
-	"""mailMan manages player interactions such as tags reported via text messages or emails"""
-	def __init__(self, playerManager):
-		super(mailMan, self).__init__()
-		self.mail = imaplib.IMAP4_SSL('imap.gmail.com')
-		self.mail.login(args.username,args.password)
-		self.mail.list()
-		# Out: list of "folders" aka labels in gmail.
-		self.mail.select("inbox") #connect to inbox.
-
-	def getBody(self, emailMessage):
-		maintype = emailMessage.get_content_maintype()
-		if maintype == 'multipart':
-			for part in emailMessage.get_payload():
-				if part.get_content_maintype() == 'text':
-					return part.get_payload()
-		elif maintype == 'text':
-			return emailMessage.get_payload()
-
-	def getUnread(self):
-		self.mail.select("inbox") # Select inbox or default namespace
-		(retcode, messages) = self.mail.search(None, '(UNSEEN)')
-
-		if retcode == 'OK' and messages[0] != '':
-			retlist = []
-			try:		
-				for num in messages[0].split(' '):
-					typ, data = self.mail.fetch(num,'(RFC822)')
-					msg = email.message_from_string(data[0][1])
-					if retcode == 'OK':
-						for item in str(msg).split('\n'):
-							#finds who sent the message
-							if re.match("From: ",item):
-								retlist.append((item[6:], self.getBody(msg).rstrip()))
+				while True:
+					links = get_urls_from_response(r)
+					if len(links) == 0 or self.depth <= maxLinksFollowed:
+						break
+					r= requests.get(random.choice(set(links)))
+					delay(2)
+					self.depth += 1
 			except Exception, e:
-				return None
-			return retlist
-		else:
-			return None
+				if debug:
+					print str(ipaddr) + ':' + str(port)
+					print e
+			delay()
 
-
-
-class players(object):
-	"""manages the player"""
-	def __init__(self, pDict):
-		super(players, self).__init__()
-		self.pDict = pDict
-	#makes a particular player a zombie
-	def makeZombie(self, pID):
-		if pID in set(self.pDict.keys()):
-			self.pDict[pID].zombie = True
-			return True
-		else:
-			return False
-
-
-	#makes a particular player a human
-	def makeHuman(self, pID):
-		if pID in self.pDict.keys():
-			self.pDict[pID].zombie = False
-			return True
-		else:
-			return False
-	def chosePZ(self):
-
-		picking = True
-		print "\033c"
-		while picking:
-			#clears the screen.
+class httpProxy(object):
+	"""docstring for httpProxy"""
+	def __init__(self):
+		super(httpProxy, self).__init__()
+	def run(self, ipaddr, port):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		print 'http-proxy: ' + str(port)
+		while not TheEndOfTime:
 			
-			selection = raw_input("Enter the player ID of the player who you would like to be PZ.\nIf you don't enter anything here a pz will be chosen at random.\n-> ")
-			if selection == "":
-				selection = random.choice(self.pDict.keys())
-
-				print "%s (%s) will be set as PZ, are you satisfied with this choice? (Y/N)" % (self.pDict[selection].getAttribs()[0], selection)
-				
-				satisfied = raw_input("-> ")
-				if satisfied.lower() == 'y':
-					self.pDict[selection].PZero = True
-					picking = False
-				elif satisfied.lower() != 'n':
-					print "\033c"
-					print "Please enter a 'Y' or an 'N'.\n"
-
-			else:
+			url = 'http://' + str(ipaddr)
+			try:
+				r=requests.get(url)
+			except Exception, e:
 				try:
-					self.pDict[selection].PZero = True
-					print "%s (%s) will be set as PZ, is this correct? (Y/N)" % (self.pDict[selection].getAttribs()[0], selection)
-					satisfied = raw_input("-> ")
+					url = 'https://' + str(ipaddr)
+					r=requests.get(url, verify=True)
+				except Exception, e:
+					if debug:
+						raise e
+			try:		
+				while True:
+					links = get_urls_from_response(r)
+					if len(links) == 0 or self.depth <= maxLinksFollowed:
+						break
+					r= requests.get(random.choice(set(links)))
+					delay(2)
+					self.depth += 1
+			except Exception, e:
+				if debug:
+					print str(ipaddr) + ':' + str(port)
+					print e
+			delay()
 
-					if satisfied.lower() == 'y':
-						self.pDict[selection].PZero = True
-						picking = False
-					elif satisfied.lower() != 'n':
-						print "\033c"
-						print "Please enter a 'Y' or an 'N'.\n"
-				except:
-					print "\033c"
-					print "That player ID does not exist please enter another one."
+class ssh(object):
+	"""docstring for ssh"""
+	def __init__(self):
+		super(ssh, self).__init__()
+	def run(self, ipaddr, port=22):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		print "ssh"
+
+class pop(object):
+	"""docstring for pop3"""
+	def __init__(self):
+		super(pop, self).__init__()
+	def run(self, ipaddr, port=110):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		print "pop3"
+		while not TheEndOfTime:
+			M = poplib.POP3(ipaddr, port)
+			M.user("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n")
+			M.pass_(randomword(6))
+			numMessages = len(M.list()[1])
+			for i in range(numMessages):
+				for j in M.retr(i+1)[1]:
+					pass
+			delay()
+
+class smtp(object):
+	"""docstring for smtp"""
+	def __init__(self):
+		super(smtp, self).__init__()
+	def run(self, ipaddr, port=25): #smtp runs on port 25
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		print "smtp"
+		msg = MIMEText('This is the body of the message.')
+		msg['To'] = email.utils.formataddr(('Recipient', 'recipient@example.com'))
+		msg['From'] = email.utils.formataddr(('Author', 'author@example.com'))
+		msg['Subject'] = 'Simple test message'
+		while not TheEndOfTime:
+			try:
+				server = smtplib.SMTP(ipaddr, port)
+				server.sendmail('author@example.com', ['recipient@example.com'], msg.as_string())
+			except Exception, e:
+				if debug:
+					raise e
+			delay()
+
+class imap(object):
+	"""docstring for imap"""
+	def __init__(self):
+		super(imap, self).__init__()
+	def run(self, ipaddr, port=143):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		while not TheEndOfTime:
+			try:
+				M = imaplib.IMAP4(ipaddr, port)
+				M.login(getpass.getuser(), getpass.getpass())
+				M.select()
+				typ, data = M.search(None, 'ALL')
+				for num in data[0].split():
+				    typ, data = M.fetch(num, '(RFC822)')
+				    print 'Message %s\n%s\n' % (num, data[0][1])
+				M.close()
+				M.logout()
+			except Exception, e:
+				if debug:
+					raise e
+
+class dhcp(object):
+	"""docstring for dhcp"""
+	def __init__(self):
+		super(dhcp, self).__init__()
+	def run(self, ipaddr='0.0.0.0', port=67):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		print "dhcp"
+		self.netopt = {'client_listen_port':68,
+					   'server_listen_port':port,
+					   'listen_address':str(ipaddr)}
+		self.client = Client(self.netopt)
+		while not TheEndOfTime:
+			try:
+				self.client.BindToAddress()
+				self.client.GetNextDhcpPacket()
+			except Exception, e:
+				if debug:
+					raise e
+			delay()
+
+class dns(object):
+	"""docstring for dns"""
+	def __init__(self):
+		super(dns, self).__init__()
+	def run(self, ipaddr='8.8.8.8', port=22):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		resolver = dnsResolver.Resolver()
+		resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
+		while not TheEndOfTime:
+			try:
+				answers = dns.resolver.query( randomword() + "." + randomword() + ".com", dns.rdtypes.ANY)
+			except Exception, e:
+				if debug:
+					raise e
+			delay()
+	
+
+class generaric(object):
+	"""docstring for generaric"""
+	def __init__(self):
+		super(generaric, self).__init__()
+	def run(self, ipaddr, port, protocol, packetSize=64):
+		t = threading.Thread(target=self.open, args=(ipaddr, port, protocol, packetSize))
+		t.start()
+		return t
+	def open(self, ipaddr, port, protocol, packetSize):
+		print '*'
+		print protocol
+		if protocol == 'tcp':
+			while not TheEndOfTime:
+				try:
+					sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+					sock.connect((ipaddr,port))
+					sock.send(randomword(packetSize))
+				except Exception, e:
+					if debug:
+						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+						raise e
+				
+		else:
+			while not TheEndOfTime:
+				try:
+					sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+					sock.sendto(randomword(packetSize), (ipaddr, port))
+				except Exception, e:
+					raise e
+
+
+#translates a service name into an object
+serviceDict = {
+	'telnet':telnet(), #done? like it should be working but again, no telnet setup...
+	'http':http(), #done
+	'https':https(), #done
+	'http-proxy':httpProxy(), #done
+	'ftp':ftp(), #in progress needs more testing
+	'sftp':sftp(), #done needs more testing (srsly, like i don't have an sftp server...)
+	'tftp':tftp(), #should be done
+	'dhcp':dhcp(), #done needs more testing
+	'ssh':ssh(), 
+	'pop3':pop(), #works?
+	'imap':imap(), 
+	'smtp':smtp(),
+	'dns':dns() #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
+	#generic done just opens a socket(TCP/UDP dependent on the nmap results) and send random ASCII data to the service
+}
 
 
 
-
-#holds values for a single player
-class player(object):
-	"""represents players and their values"""
-	def __init__(self, name, number, email):
-		super(player, self).__init__()
-		self.name = name
-		self.number = number
-		self.email = email
-		self.zombie = False
-		self.PZero = False
-		self.kills = 0
-		self.activeCooldown = 0
-	#returns a tupple of the name, phone number(formated as an email address) and email address of the playes.
-	def getAttribs(self):
-		return (self.name, self.number, self.email, self.zombie, self.PZero, self.kills, self.activeCooldown)
-
-
-
-
-#Handles the login and sending of email messages via SMTP
-class messaging(object):
-	"""Manages all functions of the program related to sending messages but not receving them"""
-	def __init__(self,fromaddr,playerManager):
-		super(messaging, self).__init__()
-		self.fromaddr = fromaddr
-		self.server = smtplib.SMTP('smtp.gmail.com:587')
-		self.server.starttls()
-
-		print "Atempting to long in to %s (username: %s)" % (self.fromaddr, args.username)
-		try:
-			self.server.login(args.username,args.password)
-			print "login worked"
-		except Exception, e:
-			print "\nlogin failed, are your sure your username and password are correct?"
-			sys.exit()
-
-	#I should call all of the "send*" functions "text*" but im going to //todo that for now.
-	def sendSingle(self, returnAddress, msg):
-		self.server.sendmail(self.fromaddr, returnAddress, msg)
-
-	def sendZombies(self, msg):
-		for key in keys:
-			if playerManager.pDict[key].zombie or playerManager.pDict[key].PZero:
-				self.server.sendmail(self.fromaddr, playerManager.pDict[key].number, msg)
-				time.sleep(0.5)
-
-	def sendHumans(self, msg):
-		for key in keys:
-			if not playerManager.pDict[key].zombie:
-				self.server.sendmail(self.fromaddr, playerManager.pDict[key].number, msg)
-				time.sleep(0.5)
-
-	def sendPZero(self, msg):
-		for key in keys:
-			if playerManager.pDict[key].PZero:
-				self.server.sendmail(self.fromaddr,playerManager.pDict[key].number, msg)
-				time.sleep(0.5)
-
-	def sendPIDs(self, pIDlist, msg):
-		for pIDs in pIDlist:
-			self.server.sendmail(self.fromaddr, playerManager.pDict[pID].number, msg)
-			time.sleep(0.5)
-
-	def emailZombies(self, msg):
-		for key in keys:
-			if playerManager.pDict[key].zombie:
-				self.server.sendmail(self.fromaddr, playerManager.pDict[key].email, msg)
-				time.sleep(0.5)
-
-	def emailHumans(self, msg):
-		for key in keys:
-			if not playerManager.pDict[key].zombie:
-				self.server.sendmail(self.fromaddr, playerManager.pDict[key].email, msg)
-				time.sleep(0.5)
-
-	def emailPZero(self, msg):
-		for key in keys:
-			if playerManager.pDict[key].PZero:
-				self.server.sendmail(self.fromaddr,playerManager.pDict[key].email, msg)
-				time.sleep(0.5)
+class host(object):
+	"""
+	represents a host
+	ipaddr: the ip address of the host
+	port: the port number of the service"""
+	def __init__(self, host):
+		self.host = host
+		self.address = self.host.address
+		self.serviceThreads = []
+		print host.get_open_ports()
+		print host.hostnames
+		
+	def startTraffic(self):
+		
+		for serv in self.host.services:
+			temp = None
+			if 'filtered' not in serv.state and 'closed' not in serv.state or atemptFilteredAndClosedConnections:
+				temp = serviceDict.get(serv.service, None)
+				if temp != None:
+					self.serviceThreads.append(temp.run(self.address, serv.port))
+				else:
+					temp = generaric() 
+					self.serviceThreads.append(temp.run(self.address, serv.port, serv.protocol))
+	def getServiceThreads(self):
+		return self.serviceThreads
 
 
-
-
-
-#############################################################################
-##a couple of ultity funcitons that are up here for clenlyness			   ##
-##and that realy only main (and truthfuly not even main) has to care about.##
-#############################################################################
-
-#cleens up the numbers from the .csv only needed by the main.
-def cleenUpNumber(num):
-	all=string.maketrans('','')
-	nodigs=all.translate(all, string.digits)
-	num = num.translate(all, nodigs)
-
-	return num
-
-#returns a dict of players 
-def processFile(fileName):
-	carrerDict = {'Alltel Wireless':'@message.Alltel.com', 'Boost Mobile':'@myboostmobile.com', 'AT&T':'@txt.att.net','Sprint':'@messaging.sprintpcs.com','Straight Talk':'@VTEXT.COM', 'T-Mobile':'@tmomail.net','U.S. Cellular':'@email.uscc.net', 'Verizon':'@vtext.com', 'Virgin Mobile':'@vmobl.com'}
-
-	playerTempList=[]
-
-	with open(fileName, 'rb') as csvFile:
-		csvData = csv.reader(csvFile, dialect='excel')
-		for row in csvData:
-			#+9sdG is the SHA1 hash of an empty row
-			if row[0] != "+9sdG":
-				cleenNum = cleenUpNumber(row[2])
-
-				cleenNum = cleenNum+carrerDict[row[3]]
-
-				row.remove(row[2])
-				row.insert(2, cleenNum)
-
-				playerTempList.append((row[0], player(row[1],row[2],row[4])))
-		playerDict = dict(playerTempList)
-
-	return playerDict
-
-
-#Main is mostly used to set some stuff up and for debug but honestly not much else because the rest of it is handled by the threads.
 def main():
-
-
-	#Create the object to handle sending messages.
-	messenger = messaging(args.account, playerManager)
-	#messenger = None
-	if not args.r:
-		playerManager.chosePZ()
-
-	print "\033cSending players thier pIDs (this will take some time)..."
-	tempNum = ""
-	for key in keys:
-		msg = "\nYour pID is " + key
-		#print msg
-		tempNum = playerManager.pDict[key].number
-		messenger.sendSingle(tempNum, msg)
-		msg = "\nThe follwing messages are a command reffrence, it is recomended that you save it for refrence throughtout the game. Commands have an hour cooldown."
-		messenger.sendSingle(tempNum, msg)
-		msg = "\nHelp location\nThe help command allows a human to call for help from other humans.\nExample: help east hall"
-		messenger.sendSingle(tempNum, msg)
-		msg = "\nTagged pID\nThe tagged command allows a zombe or PZ to report a tag without having to get a hold of the admins.\nExample: tagged +9sdG"
-		messenger.sendSingle(tempNum, msg)
-		msg = "\nSiege location HH:MM\nActs like help but for zombies, is sent to all zombies, the location must be on campus.\nExample: siege science center"
-		messenger.sendSingle(tempNum, msg)
-
-	messenger.sendPZero("Hello, you have been selected as PZ for this gmae, you have no cooldown on your seiges")
-	mail = mailMan(playerManager)
-	#mail=None
-	game = gameLogic(playerManager,mail, messenger)
-	menu(game.run(), messenger)
-
-
-
+	global TheEndOfTime
+	try:
+		report = NmapParser.parse_fromfile(inputFile)
+		hostlist = [host(node) for node in report.hosts]
+		for targetHost in hostlist:
+			targetHost.startTraffic()
+	except Exception, e:
+		if debug:
+			print e
+	try:
+		while not TheEndOfTime:
+			delay(-25)
+	except KeyboardInterrupt:
+		print 'working, things should close out in the worst case after there last command plus whatever delay you have set up'
+		TheEndOfTime = True
+#		for hostlet in hostlist:
+#			for service in hostlet.getServiceThreads():
+#				service.join()
+#				print 'close'
 if __name__ == '__main__':
-	#parses the args...
-	parser = argparse.ArgumentParser(description="Helps with adminstration and management of Humans Vs. Zombies games.")
-	parser.add_argument('account',	type=str, help="The address of the email account you are using i.e. example@gmail.com")
-	parser.add_argument('username', type=str, help="The username of the email account you want to login to.")
-	parser.add_argument('password', type=str, help="The password of the email account you want to login to.")
-	parser.add_argument('-f', type=str, help="The name of the .csv file containing the list of players.\nWill be ignored if the -r flag is given.")
-	parser.add_argument('-r', action='store_true', help="Tells the program to atempt to recover a game that has been shut down.")
-
-	args=parser.parse_args()
-
-	#checks to see that flags are set.
-	if not args.r and args.f == None:
-		raw_input("Please set either the -f or the -r flag.\n<--Press Enter To Exit-->")
-		sys.exit()
-
-	#attempts to recover from a backup
-	if args.r:
-		fp = open('backup.dat', 'rb')
-		playerManager = pickle.load(fp)
-	else:
-		#create the player manager object from the .csv
-		playerManager = players(processFile(args.f))
-		keys = playerManager.pDict.keys()
 	main()
