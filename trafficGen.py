@@ -26,16 +26,16 @@ import threading
 import random, string
 import time
 import email.utils
+import sys
 
 #actual globaly scoped varables
 hostlist = []
-TheEndOfTime = False
 
 #config
 atemptFilteredAndClosedConnections = False
 inputFile = "test.xml"
-debug = True
-delayFactor = 30 #the value time is modded by
+debug = False
+delayFactor = 100 #the value time is modded by
 maxLinksFollowed = 3
 
 
@@ -76,7 +76,6 @@ class telnet(object):
 	def __init__(self):
 		super(telnet, self).__init__()
 	def run(self, ipaddr, port=23):
-		self.arguments = (port, ipaddr)
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
@@ -85,11 +84,10 @@ class telnet(object):
 			try:
 				tn = telnetlib.Telnet(ipaddr, port)
 
-				tn.read_until("login: ")
+				tn.read_until("login: ", 2)
 				tn.write("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n") #type some random junk for the username
-				if password:
-					tn.read_until("Password: ")
-					tn.write(randomword() + "DontBanPlx\n") #type some random junk for the password
+				tn.read_until("Password: ", 2)
+				tn.write(randomword() + "DontBanPlx\n") #type some random junk for the password
 
 				#these should never ever ever execute but if the do it does an ls and exits
 				tn.write("ls\n")
@@ -98,6 +96,7 @@ class telnet(object):
 				delay(-1)
 			except Exception, e:
 				if debug:
+					print 'telnet'
 					print e
 			delay()
 
@@ -107,7 +106,7 @@ class ftp(object):
 	def __init__(self):
 		super(ftp, self).__init__()
 	def run(self, ipaddr, port=21):
-		t = threading.Thread(target=self.open, args=(port, ipaddr))
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -120,6 +119,7 @@ class ftp(object):
 				ftp.quit() #gtfo
 			except Exception, e:
 				if debug:
+					print 'ftp'
 					print e
 			delay()
 
@@ -128,7 +128,7 @@ class sftp(object):
 	def __init__(self):
 		super(sftp, self).__init__()
 	def run(self, ipaddr, port=115):
-		t = threading.Thread(target=self.open, args=(port, ipaddr))
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -139,6 +139,7 @@ class sftp(object):
 				connection.close()
 			except Exception, e:
 				if debug:
+					print 'sftp'
 					print e
 			delay()
 		
@@ -162,6 +163,7 @@ class tftp(object):
 				client.download('exists', 'downloaded.dat')
 			except Exception, e:
 				if debug:
+					print 'tftp'
 					raise e
 			delay()
 						
@@ -180,7 +182,7 @@ class http(object):
 		while not TheEndOfTime:
 			try:
 				url = 'http://' + str(ipaddr)
-				r=requests.get(url, verify=False)
+				r=requests.get(url)
 
 				while True:
 					links = get_urls_from_response(r)
@@ -191,8 +193,10 @@ class http(object):
 					self.depth += 1
 			except Exception, e:
 				if debug:
-					print str(ipaddr) + ':' + str(port)
+					print 'http:' + str(ipaddr) + ':' + str(port)
 					print e
+
+			self.depth = 0
 			delay()
 
 class https(object):
@@ -220,14 +224,16 @@ class https(object):
 					self.depth += 1
 			except Exception, e:
 				if debug:
-					print str(ipaddr) + ':' + str(port)
+					print 'https:' + str(ipaddr) + ':' + str(port)
 					print e
+			self.depth = 0
 			delay()
 
 class httpProxy(object):
 	"""docstring for httpProxy"""
 	def __init__(self):
 		super(httpProxy, self).__init__()
+		self.depth =0 
 	def run(self, ipaddr, port):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
@@ -240,11 +246,15 @@ class httpProxy(object):
 			try:
 				r=requests.get(url)
 			except Exception, e:
+				if debug:
+					print 'http-proxy'
+					print e
 				try:
 					url = 'https://' + str(ipaddr)
 					r=requests.get(url, verify=True)
 				except Exception, e:
 					if debug:
+						print 'http-proxy'
 						raise e
 			try:		
 				while True:
@@ -256,8 +266,9 @@ class httpProxy(object):
 					self.depth += 1
 			except Exception, e:
 				if debug:
-					print str(ipaddr) + ':' + str(port)
+					print 'http-proxy' + str(ipaddr) + ':' + str(port)
 					print e
+			self.depth = 0
 			delay()
 
 class ssh(object):
@@ -282,13 +293,19 @@ class pop(object):
 	def open(self, ipaddr, port):
 		print "pop3"
 		while not TheEndOfTime:
-			M = poplib.POP3(ipaddr, port)
-			M.user("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n")
-			M.pass_(randomword(6))
-			numMessages = len(M.list()[1])
-			for i in range(numMessages):
-				for j in M.retr(i+1)[1]:
-					pass
+			try:
+				M = poplib.POP3(ipaddr, port)
+				M.user("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n")
+				M.pass_(randomword(6))
+				numMessages = len(M.list()[1])
+				for i in range(numMessages):
+					for j in M.retr(i+1)[1]:
+						pass
+			except Exception, e:
+				if debug:
+					print 'pop3'
+					raise e
+			
 			delay()
 
 class smtp(object):
@@ -311,6 +328,7 @@ class smtp(object):
 				server.sendmail('author@example.com', ['recipient@example.com'], msg.as_string())
 			except Exception, e:
 				if debug:
+					print 'smtp'
 					raise e
 			delay()
 
@@ -336,6 +354,7 @@ class imap(object):
 				M.logout()
 			except Exception, e:
 				if debug:
+					print 'imap'
 					raise e
 
 class dhcp(object):
@@ -358,6 +377,7 @@ class dhcp(object):
 				self.client.GetNextDhcpPacket()
 			except Exception, e:
 				if debug:
+					print 'dhcp'
 					raise e
 			delay()
 
@@ -377,6 +397,7 @@ class dns(object):
 				answers = dns.resolver.query( randomword() + "." + randomword() + ".com", dns.rdtypes.ANY)
 			except Exception, e:
 				if debug:
+					print 'dns'
 					raise e
 			delay()
 	
@@ -398,10 +419,13 @@ class generaric(object):
 					sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 					sock.connect((ipaddr,port))
 					sock.send(randomword(packetSize))
+					sock.close()
 				except Exception, e:
+					sock.close()
+					sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 					if debug:
-						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-						raise e
+						print 'TCP'
+						print e
 				
 		else:
 			while not TheEndOfTime:
@@ -409,7 +433,9 @@ class generaric(object):
 					sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 					sock.sendto(randomword(packetSize), (ipaddr, port))
 				except Exception, e:
-					raise e
+					if debug:
+						print 'UDP'
+						print e
 
 
 #translates a service name into an object
@@ -424,8 +450,8 @@ serviceDict = {
 	'dhcp':dhcp(), #done needs more testing
 	'ssh':ssh(), 
 	'pop3':pop(), #works?
-	'imap':imap(), 
-	'smtp':smtp(),
+	'imap':imap(), #done(?)
+	'smtp':smtp(), #done(?)
 	'dns':dns() #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
 	#generic done just opens a socket(TCP/UDP dependent on the nmap results) and send random ASCII data to the service
 }
@@ -461,6 +487,7 @@ class host(object):
 
 def main():
 	global TheEndOfTime
+	TheEndOfTime = False
 	try:
 		report = NmapParser.parse_fromfile(inputFile)
 		hostlist = [host(node) for node in report.hosts]
@@ -471,10 +498,17 @@ def main():
 			print e
 	try:
 		while not TheEndOfTime:
-			delay(-25)
+			time.sleep(15)
 	except KeyboardInterrupt:
 		print 'working, things should close out in the worst case after there last command plus whatever delay you have set up'
 		TheEndOfTime = True
+		while threading.activeCount() > 3:
+			if debug:
+				print 'Threads remaining: ' +  str(threading.activeCount()) + ': ' + str(threading.enumerate())
+			else:
+				print 'Threads remaining: ' +  str(threading.activeCount())
+			time.sleep(10)
+		sys.exit()
 #		for hostlet in hostlist:
 #			for service in hostlet.getServiceThreads():
 #				service.join()
