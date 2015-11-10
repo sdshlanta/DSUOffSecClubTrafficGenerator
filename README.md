@@ -1,7 +1,7 @@
 # DSUOffSecClubTrafficGenerator
 A traffic generator writen in python
 
-`inputFile` defines the name the input file
+`inputFile` defines the name the input file currently the program takes the an nmap scan in an xml format (the `-oX` flag in nmap)
 
 `maxLinksFollowed` defines how many links the HTTP spiders will follow
 
