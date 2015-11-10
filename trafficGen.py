@@ -22,17 +22,19 @@ import smtplib, imaplib, poplib #for SMTP IMAP and POP3, basicly all email
 import tftpy #for TFTP
 import dns.resolver as dnsResolver # for DNS
 import pysftp # for SFTP
-import argparse
 import threading
 import random, string
 import time
 import email.utils
 
+atemptFilteredAndClosedConnections = False
 inputFile = "test.xml"
 debug = True
-delayFactor = 1024 #the value time is modded by
+delayFactor = 30 #the value time is modded by
+maxLinksFollowed = 3
+
+#actual globaly scoped varables
 hostlist = []
-maxLinksFollowed = 3 
 TheEndOfTime = False
 
 
@@ -48,10 +50,10 @@ def randomword(length=6):
 	return ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(length))
 
 def rand():
-	return int(random.SystemRandom().random()*1000000000000000000) #just making it an int ignore the magic number
+	return random.SystemRandom().random()*1000000000000000000 # ignore the magic number
 
 def delay(addtionalDelay=0):
-	time.sleep((rand()%delayFactor)+addtionalDelay)
+	time.sleep((int(rand())%delayFactor)+addtionalDelay)
 
 class Client(DhcpClient):
 	"""implmented for the dhcp client"""
@@ -74,7 +76,6 @@ class telnet(object):
 	def run(self, ipaddr, port=23):
 		self.arguments = (port, ipaddr)
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -105,7 +106,6 @@ class ftp(object):
 		super(ftp, self).__init__()
 	def run(self, ipaddr, port=21):
 		t = threading.Thread(target=self.open, args=(port, ipaddr))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -127,7 +127,6 @@ class sftp(object):
 		super(sftp, self).__init__()
 	def run(self, ipaddr, port=115):
 		t = threading.Thread(target=self.open, args=(port, ipaddr))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -147,7 +146,6 @@ class tftp(object):
 		super(tftp, self).__init__()
 	def run(self, ipaddr, port=69):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -172,7 +170,6 @@ class http(object):
 		self.depth = 0
 	def run(self, ipaddr, port=80):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(False)
 		t.start()
 		return t	
 
@@ -203,7 +200,6 @@ class https(object):
 		self.depth = 0
 	def run(self, ipaddr, port=443):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -232,7 +228,6 @@ class httpProxy(object):
 		super(httpProxy, self).__init__()
 	def run(self, ipaddr, port):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(False)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -269,7 +264,6 @@ class ssh(object):
 		super(ssh, self).__init__()
 	def run(self, ipaddr, port=22):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -281,7 +275,6 @@ class pop(object):
 		super(pop, self).__init__()
 	def run(self, ipaddr, port=110):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -302,7 +295,6 @@ class smtp(object):
 		super(smtp, self).__init__()
 	def run(self, ipaddr, port=25): #smtp runs on port 25
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -326,7 +318,6 @@ class imap(object):
 		super(imap, self).__init__()
 	def run(self, ipaddr, port=143):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -351,7 +342,6 @@ class dhcp(object):
 		super(dhcp, self).__init__()
 	def run(self, ipaddr='0.0.0.0', port=67):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
@@ -378,28 +368,50 @@ class dns(object):
 		super(dns, self).__init__()
 	def run(self, ipaddr='8.8.8.8', port=22):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.setDaemon(True)
 		t.start()
 		return t
 	def open(self, ipaddr, port):
 		resolver = dnsResolver.Resolver()
 		resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
 		while not TheEndOfTime:
-			answers = dns.resolver.query( randomword() + "." + randomword() + ".com", dns.rdtypes.ANY)
+			try:
+				answers = dns.resolver.query( randomword() + "." + randomword() + ".com", dns.rdtypes.ANY)
+			except Exception, e:
+				if debug:
+					raise e
 			delay()
+	
 
 class generaric(object):
 	"""docstring for generaric"""
 	def __init__(self):
 		super(generaric, self).__init__()
-	def run(self, ipaddr, port, protocol):
-		t = threading.Thread(target=self.open, args=(ipaddr,port,protocol))
-		t.setDaemon(True)
+	def run(self, ipaddr, port, protocol, packetSize=64):
+		t = threading.Thread(target=self.open, args=(ipaddr, port, protocol, packetSize))
 		t.start()
 		return t
-	def open(self, ipaddr, port, protocol):
+	def open(self, ipaddr, port, protocol, packetSize):
 		print '*'
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		print protocol
+		if protocol == 'tcp':
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			while not TheEndOfTime:
+				try:
+					sock.connect((ipaddr,port))
+					sock.send(randomword(packetSize))
+				except Exception, e:
+					if debug:
+						sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+						raise e
+				
+		else:
+			sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+			while not TheEndOfTime:
+				try:
+					sock.sendto(randomword(packetSize), (ipaddr, port))
+				except Exception, e:
+					raise e
+
 
 #translates a service name into an object
 serviceDict = {
@@ -416,7 +428,7 @@ serviceDict = {
 	'imap':imap(), 
 	'smtp':smtp(),
 	'dns':dns() #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
-	#generic needs to be done which should just open a socket(TCP/UDP dependent on the nmap results) and send random ASCII data to the service
+	#generic done just opens a socket(TCP/UDP dependent on the nmap results) and send random ASCII data to the service
 }
 
 
@@ -436,13 +448,14 @@ class host(object):
 	def startTraffic(self):
 		
 		for serv in self.host.services:
-			temp = serviceDict.get(serv.service, None)
-			#if str(temp) == 'hurp':
-			if temp != None:
-				self.serviceThreads.append(temp.run(self.address, serv.port))
-			else:
-				temp = generaric() 
-				self.serviceThreads.append(temp.run(self.address, serv.port, serv.protocol))
+			temp = None
+			if 'filtered' not in serv.state and 'closed' not in serv.state or atemptFilteredAndClosedConnections:
+				temp = serviceDict.get(serv.service, None)
+				if temp != None:
+					self.serviceThreads.append(temp.run(self.address, serv.port))
+				else:
+					temp = generaric() 
+					self.serviceThreads.append(temp.run(self.address, serv.port, serv.protocol))
 	def getServiceThreads(self):
 		return self.serviceThreads
 
@@ -459,7 +472,7 @@ def main():
 			print e
 	try:
 		while not TheEndOfTime:
-			delay(9999)
+			delay(-25)
 	except KeyboardInterrupt:
 		print 'working, things should close out in the worst case after there last command plus whatever delay you have set up'
 		TheEndOfTime = True
