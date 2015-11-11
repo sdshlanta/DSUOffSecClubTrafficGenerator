@@ -10,4 +10,4 @@ A traffic generator made for the Dakota State University offensive security club
 `debug` tells the program to print debug mesages print debugging messages
 
 
-SSH has not been implmented yet because i wrote this on a windows box and paramiko doesn't work on windows.  If some kind soul would like to implment SSH I would pay you in sexual favors
+SSH has not been implmented yet because I wrote this on a windows box and paramiko doesn't work on windows.  Will be implmented soontm
