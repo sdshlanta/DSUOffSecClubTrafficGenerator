@@ -7,6 +7,7 @@ A traffic generator made for the Dakota State University offensive security club
 `maxLinksFollowed` defines how many links the HTTP spiders will follow
 
 `delayFactor` is the maximum time -1 the the program will wait before making another request, the avrage delay is about half the delayFactor (set to 1024 be default)
+
 `debug` tells the program to print debug mesages print debugging messages
 
 
