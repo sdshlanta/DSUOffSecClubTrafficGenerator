@@ -2,6 +2,8 @@
 
 A traffic generator made for the Dakota State University offensive security club
 
+`attemptClosedAndFilteredConnections` tells the program if it should attempt to connect to closed or filtered connections.
+
 `inputFile` defines the name the input file currently the program takes the an nmap scan in an xml format (the `-oX` flag in nmap)
 
 `maxLinksFollowed` defines how many links the HTTP spiders will follow
