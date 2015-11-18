@@ -55,9 +55,7 @@ delayFactor = args.d #the value time is modded by
 maxLinksFollowed = args.l
 underRemoteControll = args.r
 
-port = 1170
-
-
+listenPort = 2187
 
 def get_urls_from_response(r):
 	soup = BeautifulSoup(r.text, 'html.parser')
@@ -427,24 +425,24 @@ class dns(object):
 			delay()
 
 class smb(object):
-"""docstring for smb"""
-def __init__(self):
-	super(smb, self).__init__()
-def run(self, ipaddr, port=22):
-	t = threading.Thread(target=self.open, args=(ipaddr, port))
-	t.start()
-	return t
-def open(self, ipaddr, port):
-	resolver = dnsResolver.Resolver()
-	resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
-	while not TheEndOfTime:
-		try:
-			conn = SMBConnection(randomword(), randomword, randomword, ipaddr, use_ntlm_v2 = True)
-		except Exception, e:
-			if debug:
-				print 'smb'
-				raise e
-		delay()
+	"""docstring for smb"""
+	def __init__(self):
+		super(smb, self).__init__()
+	def run(self, ipaddr, port=22):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		resolver = dnsResolver.Resolver()
+		resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
+		while not TheEndOfTime:
+			try:
+				conn = SMBConnection(randomword(), randomword, randomword, ipaddr, use_ntlm_v2 = True)
+			except Exception, e:
+				if debug:
+					print 'smb'
+					raise e
+			delay()
 
 class generaric(object):
 	"""docstring for generaric"""
@@ -498,7 +496,7 @@ serviceDict = {
 	'pop3':pop(), #works?
 	'imap':imap(), #done(?)
 	'smtp':smtp(), #done(?)
-	'dns':dns() #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
+	'dns':dns(), #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
 	'smb':smb()
 	#generic done just opens a socket(TCP/UDP dependent on the nmap results) and send random ASCII data to the service
 }
@@ -519,7 +517,7 @@ class host(object):
 		
 		for serv in self.host.services:
 			temp = None
-			if atemptFilteredAndClosedConnections or 'filtered' not in serv.state and 'closed' not in serv.stat :
+			if atemptFilteredAndClosedConnections or 'filtered' not in serv.state and 'closed' not in serv.state:
 				temp = serviceDict.get(serv.service, None)
 				if temp != None:
 					self.serviceThreads.append(temp.run(self.address, serv.port))
@@ -541,12 +539,12 @@ def localControll():
 			print e
 	try:
 		while not TheEndOfTime:
-			selection = raw_input("\033cRemaining Threads: " + str(threading.activeCount()) + "1.) UDP kamehameha\n0.) Exit")
+			selection = raw_input("Remaining Threads: " + str(threading.activeCount()) + "\n" + "1.) UDP kamehameha\n0.) Exit")
 			if selection == 1:
 				kamehameha()
 			elif selection == 0:
 				TheEndOfTime = True
-				while threading.activeCount() > 5:
+				while threading.activeCount() > 10:
 					if debug:
 						print 'Threads remaining: ' +  str(threading.activeCount()) + ': ' + str(threading.enumerate())
 					else:
@@ -556,7 +554,7 @@ def localControll():
 	except KeyboardInterrupt:
 		print '\033cworking, things should close out eventualy...\n may get stuck on the last coupple threads depending on what you have running'
 		TheEndOfTime = True
-		while threading.activeCount() > 5:
+		while threading.activeCount() > 10:
 			if debug:
 				print 'Threads remaining: ' +  str(threading.activeCount()) + ': ' + str(threading.enumerate())
 			else:
@@ -567,8 +565,22 @@ def localControll():
 def remoteControll():
 	global TheEndOfTime
 	TheEndOfTime = False
+	nmapXml = ''
+
 	try:
-		report = NmapParser.parse()
+		serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		serversocket.bind(('', listenPort))
+		serversocket.listen(4)
+		conn, remoteAddr = serversocket.accept()
+		recvBuffer = str(conn.recv(1024))
+		while recvBuffer:
+			nmapXml += recvBuffer
+			recvBuffer = str(conn.recv(1024))
+	except Exception, e:
+		if debug:
+			raise e
+	try:
+		report = NmapParser.parse(nmapXml)
 		hostlist = [host(node) for node in report.hosts]
 		for targetHost in hostlist:
 			targetHost.startTraffic()
@@ -577,8 +589,7 @@ def remoteControll():
 			print e
 	try:
 		while not TheEndOfTime:
-			selection = raw_input("\033c1.) UDP kamehameha\n0.) Exit\n-> ")
-
+			time.sleep(500);
 	except KeyboardInterrupt:
 		print '\033cworking, things should close out eventualy...\n may get stuck on the last coupple threads depending on what you have running'
 		TheEndOfTime = True
