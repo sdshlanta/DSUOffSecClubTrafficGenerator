@@ -7,7 +7,6 @@
 
 
 from libnmap.parser import NmapParser #for parsing nmap for generating the host list
-from datetime import datetime
 from bs4 import BeautifulSoup # for parsing the receved html for the spider because im lazy
 from pydhcplib.dhcp_packet import * # for DHCP
 from pydhcplib.dhcp_network import * # for DHCP
@@ -71,14 +70,6 @@ def rand():
 def delay(addtionalDelay=0):
 	time.sleep((int(rand())%delayFactor)+addtionalDelay)
 
-
-def kamehameha(ipaddr='noIPAddr', time=600):
-	if 'noIPAddr' == ipaddr:
-		ipaddr = raw_input("\033cEnter target IP address: ")
-		print "poor schmuck wont know what hit them."
-
-
-
 class Client(DhcpClient):
 	"""implmented for the dhcp client"""
 	def __init__(self, options):
@@ -120,6 +111,8 @@ class telnet(object):
 				if debug:
 					print 'telnet'
 					print e
+				else:
+					pass
 			delay()
 
 
@@ -143,6 +136,8 @@ class ftp(object):
 				if debug:
 					print 'ftp'
 					print e
+				else:
+					pass
 			delay()
 
 class sftp(object):
@@ -163,6 +158,8 @@ class sftp(object):
 				if debug:
 					print 'sftp'
 					print e
+				else:
+					pass
 			delay()
 		
 class tftp(object):
@@ -187,6 +184,8 @@ class tftp(object):
 				if debug:
 					print 'tftp'
 					raise e
+				else:
+					pass
 			delay()
 						
 class http(object):
@@ -198,7 +197,6 @@ class http(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t	
-
 	def open(self, ipaddr, port): #this also spiders the site
 		print 'http'
 		while not TheEndOfTime:
@@ -217,6 +215,8 @@ class http(object):
 				if debug:
 					print 'http:' + str(ipaddr) + ':' + str(port)
 					print e
+				else:
+					pass
 
 			self.depth = 0
 			delay()
@@ -248,6 +248,8 @@ class https(object):
 				if debug:
 					print 'https:' + str(ipaddr) + ':' + str(port)
 					print e
+				else:
+					pass
 			self.depth = 0
 			delay()
 
@@ -271,6 +273,8 @@ class httpProxy(object):
 				if debug:
 					print 'http-proxy'
 					print e
+					else:
+						pass
 				try:
 					url = 'https://' + str(ipaddr)
 					r=requests.get(url, verify=True)
@@ -278,6 +282,8 @@ class httpProxy(object):
 					if debug:
 						print 'http-proxy'
 						raise e
+					else:
+						pass
 			try:		
 				while True:
 					links = get_urls_from_response(r)
@@ -290,6 +296,8 @@ class httpProxy(object):
 				if debug:
 					print 'http-proxy' + str(ipaddr) + ':' + str(port)
 					print e
+				else:
+					pass
 			self.depth = 0
 			delay()
 
@@ -327,6 +335,8 @@ class pop(object):
 				if debug:
 					print 'pop3'
 					raise e
+				else:
+					pass
 			
 			delay()
 
@@ -352,6 +362,8 @@ class smtp(object):
 				if debug:
 					print 'smtp'
 					raise e
+				else:
+					pass
 			delay()
 
 class imap(object):
@@ -370,14 +382,15 @@ class imap(object):
 				M.select()
 				typ, data = M.search(None, 'ALL')
 				for num in data[0].split():
-				    typ, data = M.fetch(num, '(RFC822)')
-				    print 'Message %s\n%s\n' % (num, data[0][1])
+					typ, data = M.fetch(num, '(RFC822)')
 				M.close()
 				M.logout()
 			except Exception, e:
 				if debug:
 					print 'imap'
 					raise e
+				else:
+					pass
 			delay()
 
 class dhcp(object):
@@ -402,6 +415,8 @@ class dhcp(object):
 				if debug:
 					print 'dhcp'
 					raise e
+				else:
+					pass
 			delay()
 
 class dns(object):
@@ -422,6 +437,8 @@ class dns(object):
 				if debug:
 					print 'dns'
 					raise e
+				else:
+					pass
 			delay()
 
 class smb(object):
@@ -442,7 +459,40 @@ class smb(object):
 				if debug:
 					print 'smb'
 					raise e
+				else:
+					pass
 			delay()
+
+class daytime(object):
+	"""docstring for daytime"""
+	def __init__(self, arg):
+		super(daytime, self).__init__()
+		self.arg = arg
+	def run(self, ipaddr, port=13):
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	def open(self, ipaddr, port):
+		while not TheEndOfTime:
+			try:
+				s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+				s.connect((ipaddr,port))
+				while True:
+					data = s.recv(10000)
+					if data:
+						pass
+					else:
+						break
+				s.close()
+			except Exception, e:
+				if debug:
+					print 'daytime'
+					raise e
+				else:
+					pass
+			
+			delay()
+		
 
 class generaric(object):
 	"""docstring for generaric"""
@@ -497,7 +547,8 @@ serviceDict = {
 	'imap':imap(), #done(?)
 	'smtp':smtp(), #done(?)
 	'dns':dns(), #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
-	'smb':smb()
+	'smb':smb(),
+	'daytime':daytime()
 	#generic done just opens a socket(TCP/UDP dependent on the nmap results) and send random ASCII data to the service
 }
 
@@ -539,10 +590,8 @@ def localControll():
 			print e
 	try:
 		while not TheEndOfTime:
-			selection = raw_input("Remaining Threads: " + str(threading.activeCount()) + "\n" + "1.) UDP kamehameha\n0.) Exit")
-			if selection == 1:
-				kamehameha()
-			elif selection == 0:
+			selection = raw_input("Remaining Threads: " + str(threading.activeCount()) + "\n0.) Exit\n->")
+			if selection == 0:
 				TheEndOfTime = True
 				while threading.activeCount() > 10:
 					if debug:
