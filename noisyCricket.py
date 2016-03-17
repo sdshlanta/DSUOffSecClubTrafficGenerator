@@ -35,26 +35,27 @@ import tempfile
 #actual globaly scoped varables
 hostlist = []
 
+if __name__ == '__main__':
 
-parser = argparse.ArgumentParser(description='Creates "cover traffic" for red teams during mock hacking events')
-parser.add_argument('-f', type=str, default='nmap.xml', help="The name the file containing XML output from nmap, uses nmap.xml by default")
-parser.add_argument('-D', action='store_true', default=False, help="Enables Debugging, will cause strange things to hapen with the UI")
-parser.add_argument('-r', action='store_true', default=False, help='Tells the script to wait for input from a command and controll server.')
-parser.add_argument('-l', type=int, default=3, help="Sets how deep the spider will go.")
-parser.add_argument('-d', type=int, default=10, help="Sets the highest posable delay between the sending of packets")
-parser.add_argument('-c', action='store_true', default=False, help='force the program to atempt to connect to filtered and closed connections')
+	parser = argparse.ArgumentParser(description='Creates "cover traffic" for red teams during capture the flag events events')
+	parser.add_argument('-f', type=str, default='nmap.xml', help="The name the file containing XML output from nmap, uses nmap.xml by default")
+	parser.add_argument('-D', action='store_true', default=False, help="Enables Debugging, will cause strange things to hapen with the UI")
+	parser.add_argument('-r', action='store_true', default=False, help='Tells the script to wait for input from a command and controll server.')
+	parser.add_argument('-l', type=int, default=3, help="Sets how deep the spider will go.")
+	parser.add_argument('-d', type=int, default=10, help="Sets the highest posable delay between the sending of packets")
+	parser.add_argument('-c', action='store_true', default=False, help='force the program to atempt to connect to filtered and closed connections')
 
-args=parser.parse_args()
+	args=parser.parse_args()
 
-#config
-atemptFilteredAndClosedConnections = args.c
-inputFile = args.f
-debug = args.D
-delayFactor = args.d #the value time is modded by
-maxLinksFollowed = args.l
-underRemoteControll = args.r
+	#config
+	atemptFilteredAndClosedConnections = args.c
+	inputFile = args.f
+	debug = args.D
+	delayFactor = args.d #the value time is modded by
+	maxLinksFollowed = args.l
+	underRemoteControll = args.r
 
-listenPort = 2187
+listenPort = 12407
 
 def get_urls_from_response(r):
 	soup = BeautifulSoup(r.text, 'html.parser')
@@ -273,8 +274,8 @@ class httpProxy(object):
 				if debug:
 					print 'http-proxy'
 					print e
-					else:
-						pass
+				else:
+					pass
 				try:
 					url = 'https://' + str(ipaddr)
 					r=requests.get(url, verify=True)
@@ -381,8 +382,9 @@ class imap(object):
 				M.login(getpass.getuser(), getpass.getpass())
 				M.select()
 				typ, data = M.search(None, 'ALL')
-				for num in data[0].split():
-					typ, data = M.fetch(num, '(RFC822)')
+				#for num in data[0].split():
+				#	typ, data = M.fetch(num, '(RFC822)')
+				typ, data = map(lambda x: M.fetch(x, '(RFC822)'), data[0].split())
 				M.close()
 				M.logout()
 			except Exception, e:
@@ -465,9 +467,8 @@ class smb(object):
 
 class daytime(object):
 	"""docstring for daytime"""
-	def __init__(self, arg):
+	def __init__(self):
 		super(daytime, self).__init__()
-		self.arg = arg
 	def run(self, ipaddr, port=13):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
