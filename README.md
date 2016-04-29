@@ -17,4 +17,4 @@ The following is a listing of command line options
 `-r` tells the program to wait for instructions from a remote command and controll server.
 
 
-SSH has not been implmented yet because I wrote this on a windows box and paramiko doesn't work on windows.  Will be implmented soontm
+SSH has not been implmented yet because I wrote this on a windows box and paramiko doesn't work on windows.  Will be implmented soon^tm
