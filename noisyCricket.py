@@ -1,5 +1,7 @@
+#!/usr/bin/python
+
 #Python traffic generator by YoNotHim
- 
+
 #takes the xml output of an nmap scan filename is set with input file.
 #trys to connect to any common network services it is given by the nmap report
 #makes a looooot of threads so if that is a problem for you keep that in mind
@@ -57,6 +59,24 @@ if __name__ == '__main__':
 
 listenPort = 12407
 
+def boilerPlate(servName):
+	def realDec(opener):
+		def newOpen(*args, **kwargs):
+			print(servName)
+			while not TheEndOfTime:
+				try:
+					opener(*args, **kwargs)
+				except Exception, e:
+					if debug:
+						print servName
+						print e
+					else:
+						pass
+				delay()
+		return newOpen
+	return realDec
+
+
 def get_urls_from_response(r):
 	soup = BeautifulSoup(r.text, 'html.parser')
 	urls = [link.get('href') for link in soup.find_all('a')]
@@ -77,13 +97,12 @@ class Client(DhcpClient):
 		DhcpClient.__init__(self,options["listen_address"],
 							options["client_listen_port"],
 							options["server_listen_port"])
-		
 	def HandleDhcpOffer(self, packet):
 		print packet.str()
 	def HandleDhcpAck(self, packet):
 		print packet.str()
 	def HandleDhcpNack(self, packet):
-		print packet.str()  
+		print packet.str()
 
 class telnet(object):
 	"""docstring for telnet"""
@@ -93,28 +112,20 @@ class telnet(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		while not TheEndOfTime:
-			try:
-				tn = telnetlib.Telnet(ipaddr, port)
+		tn = telnetlib.Telnet(ipaddr, port)
 
-				tn.read_until("login: ", 2)
-				tn.write("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n") #type some random junk for the username
-				tn.read_until("Password: ", 2)
-				tn.write(randomword() + "DontBanPlx\n") #type some random junk for the password
+		tn.read_until("login: ", 2)
+		tn.write("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n") #type some random junk for the username
+		tn.read_until("Password: ", 2)
+		tn.write(randomword() + "DontBanPlx\n") #type some random junk for the password
 
-				#these should never ever ever execute but if the do it does an ls and exits
-				tn.write("ls\n")
-				delay(-1)
-				tn.write("exit\n")
-				delay(-1)
-			except Exception, e:
-				if debug:
-					print 'telnet'
-					print e
-				else:
-					pass
-			delay()
+		#these should never ever ever execute but if the do it does an ls and exits
+		tn.write("ls\n")
+		delay(-1)
+		tn.write("exit\n")
+		delay(-1)
 
 
 class ftp(object):
@@ -125,21 +136,13 @@ class ftp(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		while not TheEndOfTime:
-			try:
-				ftpClient = FTP()
-				ftpClient.connect(ipaddr, port)
-				ftpClient.login() #anon login
-				ftpClient.retrlines('list') #do a thing
-				ftp.quit() #gtfo
-			except Exception, e:
-				if debug:
-					print 'ftp'
-					print e
-				else:
-					pass
-			delay()
+		ftpClient = FTP()
+		ftpClient.connect(ipaddr, port)
+		ftpClient.login() #anon login
+		ftpClient.retrlines('list') #do a thing
+		ftp.quit() #gtfo
 
 class sftp(object):
 	"""docstring for sftp"""
@@ -149,20 +152,11 @@ class sftp(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
+		connection = pysftp.Connection(ipaddr, port, username='notABruteForce'+randomword(), password='seriouslyThisIsLegit' + randomword())
+		connection.close()
 
-		while not TheEndOfTime:
-			try:
-				connection = pysftp.Connection(ipaddr, port, username='notABruteForce'+randomword(), password='seriouslyThisIsLegit' + randomword())
-				connection.close()
-			except Exception, e:
-				if debug:
-					print 'sftp'
-					print e
-				else:
-					pass
-			delay()
-		
 class tftp(object):
 	"""docstring for tftp"""
 	def __init__(self):
@@ -171,24 +165,15 @@ class tftp(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		print "tftp"
-		while not TheEndOfTime:
-			try:
-				client = tftpy.TftpClient(ipaddr, port)
-				tftpFileName = 'tftp.tmp'
-				fp = file(tftpFileName, 'w')
-				fp.write(randomword(256))
-				client.upload(tftpFileName, tftpFileName)
-				client.download('exists', 'downloaded.dat')
-			except Exception, e:
-				if debug:
-					print 'tftp'
-					raise e
-				else:
-					pass
-			delay()
-						
+		client = tftpy.TftpClient(ipaddr, port)
+		tftpFileName = 'tftp.tmp'
+		fp = file(tftpFileName, 'w')
+		fp.write(randomword(256))
+		client.upload(tftpFileName, tftpFileName)
+		client.download('exists', 'downloaded.dat')
+
 class http(object):
 	"""docstring for http"""
 	def __init__(self):
@@ -197,30 +182,19 @@ class http(object):
 	def run(self, ipaddr, port=80):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
-		return t	
+		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port): #this also spiders the site
-		print 'http'
-		while not TheEndOfTime:
-			try:
-				url = 'http://' + str(ipaddr)
-				r=requests.get(url)
-
-				while True:
-					links = get_urls_from_response(r)
-					if len(links) == 0 or self.depth <= maxLinksFollowed:
-						break
-					r= requests.get(random.choice(set(links)))
-					delay(2)
-					self.depth += 1
-			except Exception, e:
-				if debug:
-					print 'http:' + str(ipaddr) + ':' + str(port)
-					print e
-				else:
-					pass
-
-			self.depth = 0
-			delay()
+		self.depth = 0
+		url = 'http://' + str(ipaddr)
+		r=requests.get(url)
+		while True:
+			links = get_urls_from_response(r)
+			if len(links) == 0 or self.depth <= maxLinksFollowed:
+				break
+			r= requests.get(random.choice(set(links)))
+			delay(2)
+			self.depth += 1
 
 class https(object):
 	"""docstring for https"""
@@ -231,76 +205,56 @@ class https(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		print 'https'
-		while not TheEndOfTime:
-			try:
-				url = 'https://' + str(ipaddr)
-				r=requests.get(url, verify=True)
+		self.depth = 0
+		url = 'https://' + str(ipaddr)
+		r=requests.get(url, verify=True)
 
-				while True:
-					links = get_urls_from_response(r)
-					if len(links) == 0 or self.depth <= maxLinksFollowed:
-						break
-					r= requests.get(random.choice(set(links)))
-					delay(2)
-					self.depth += 1
-			except Exception, e:
-				if debug:
-					print 'https:' + str(ipaddr) + ':' + str(port)
-					print e
-				else:
-					pass
-			self.depth = 0
-			delay()
+		while True:
+			links = get_urls_from_response(r)
+			if len(links) == 0 or self.depth <= maxLinksFollowed:
+				break
+			r= requests.get(random.choice(set(links)), verify=True)
+			delay(2)
+			self.depth += 1
 
 class httpProxy(object):
 	"""docstring for httpProxy"""
 	def __init__(self):
 		super(httpProxy, self).__init__()
-		self.depth =0 
+		self.depth =0
 	def run(self, ipaddr, port):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		print 'http-proxy: ' + str(port)
-		while not TheEndOfTime:
-			
-			url = 'http://' + str(ipaddr)
+		self.depth = 0
+		url = 'http://' + str(ipaddr)
+		try:
+			r=requests.get(url)
+		except Exception, e:
+			if debug:
+				print 'http-proxy'
+				print e
 			try:
-				r=requests.get(url)
+				url = 'https://' + str(ipaddr)
+				r=requests.get(url, verify=True)
 			except Exception, e:
 				if debug:
 					print 'http-proxy'
-					print e
+					raise e
 				else:
 					pass
-				try:
-					url = 'https://' + str(ipaddr)
-					r=requests.get(url, verify=True)
-				except Exception, e:
-					if debug:
-						print 'http-proxy'
-						raise e
-					else:
-						pass
-			try:		
-				while True:
-					links = get_urls_from_response(r)
-					if len(links) == 0 or self.depth <= maxLinksFollowed:
-						break
-					r= requests.get(random.choice(set(links)))
-					delay(2)
-					self.depth += 1
-			except Exception, e:
-				if debug:
-					print 'http-proxy' + str(ipaddr) + ':' + str(port)
-					print e
-				else:
-					pass
-			self.depth = 0
-			delay()
+		try:
+			while True:
+				links = get_urls_from_response(r)
+				if len(links) == 0 or self.depth <= maxLinksFollowed:
+					break
+				r= requests.get(random.choice(set(links)))
+				delay(2)
+
 
 class ssh(object):
 	"""docstring for ssh"""
@@ -310,8 +264,13 @@ class ssh(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		print "ssh"
+		sshC = paramiko.SSHClient()
+		sshC.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+		sshC.connect(hostname=ipaddr, port=port username=randomword(), password=randomword(8)
+		stdin, stdout, stderr = ssh.exec_command('ls')
+		ssh.close()
 
 class pop(object):
 	"""docstring for pop3"""
@@ -321,51 +280,31 @@ class pop(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		print "pop3"
-		while not TheEndOfTime:
-			try:
-				M = poplib.POP3(ipaddr, port)
-				M.user("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n")
-				M.pass_(randomword(6))
-				numMessages = len(M.list()[1])
-				for i in range(numMessages):
-					for j in M.retr(i+1)[1]:
-						pass
-			except Exception, e:
-				if debug:
-					print 'pop3'
-					raise e
-				else:
-					pass
-			
-			delay()
-
+		M = poplib.POP3(ipaddr, port)
+		M.user("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n")
+		M.pass_(randomword(6))
+		numMessages = len(M.list()[1])
+		for i in range(numMessages):
+			for j in M.retr(i+1)[1]:
+				pass
 class smtp(object):
 	"""docstring for smtp"""
 	def __init__(self):
 		super(smtp, self).__init__()
+		self.msg = MIMEText('This is the body of the message.')
+		self.msg['To'] = email.utils.formataddr(('Recipient', 'recipient@example.com'))
+		self.msg['From'] = email.utils.formataddr(('Author', 'author@example.com'))
+		self.msg['Subject'] = 'Simple test message'
 	def run(self, ipaddr, port=25): #smtp runs on port 25
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		print "smtp"
-		msg = MIMEText('This is the body of the message.')
-		msg['To'] = email.utils.formataddr(('Recipient', 'recipient@example.com'))
-		msg['From'] = email.utils.formataddr(('Author', 'author@example.com'))
-		msg['Subject'] = 'Simple test message'
-		while not TheEndOfTime:
-			try:
-				server = smtplib.SMTP(ipaddr, port)
-				server.sendmail('author@example.com', ['recipient@example.com'], msg.as_string())
-			except Exception, e:
-				if debug:
-					print 'smtp'
-					raise e
-				else:
-					pass
-			delay()
+		server = smtplib.SMTP(ipaddr, port)
+		server.sendmail('author@example.com', ['recipient@example.com'], self.msg.as_string())
 
 class imap(object):
 	"""docstring for imap"""
@@ -375,73 +314,50 @@ class imap(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		while not TheEndOfTime:
-			try:
-				M = imaplib.IMAP4(ipaddr, port)
-				M.login(getpass.getuser(), getpass.getpass())
-				M.select()
-				typ, data = M.search(None, 'ALL')
-				#for num in data[0].split():
-				#	typ, data = M.fetch(num, '(RFC822)')
-				typ, data = map(lambda x: M.fetch(x, '(RFC822)'), data[0].split())
-				M.close()
-				M.logout()
-			except Exception, e:
-				if debug:
-					print 'imap'
-					raise e
-				else:
-					pass
-			delay()
+		M = imaplib.IMAP4(ipaddr, port)
+		M.login(getpass.getuser(), getpass.getpass())
+		M.select()
+		typ, data = M.search(None, 'ALL')
+		#for num in data[0].split():
+		#	typ, data = M.fetch(num, '(RFC822)')
+		typ, data = map(lambda x: M.fetch(x, '(RFC822)'), data[0].split())
+		M.logout()
+		M.close()
+
 
 class dhcp(object):
 	"""docstring for dhcp"""
 	def __init__(self):
 		super(dhcp, self).__init__()
+
 	def run(self, ipaddr='255.255.255.255', port=67):
-		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.start()
-		return t
-	def open(self, ipaddr, port):
-		print "dhcp"
 		self.netopt = {'client_listen_port':68,
 					   'server_listen_port':port,
 					   'listen_address':str(ipaddr)}
 		self.client = Client(self.netopt)
-		while not TheEndOfTime:
-			try:
-				self.client.BindToAddress()
-				self.client.GetNextDhcpPacket()
-			except Exception, e:
-				if debug:
-					print 'dhcp'
-					raise e
-				else:
-					pass
-			delay()
+		t = threading.Thread(target=self.open, args=(ipaddr, port))
+		t.start()
+		return t
+	@boilerPlate(self.__class__.__name__)
+	def open(self, ipaddr, port):
+		self.client.BindToAddress()
+		self.client.GetNextDhcpPacket()
 
 class dns(object):
 	"""docstring for dns"""
 	def __init__(self):
 		super(dns, self).__init__()
 	def run(self, ipaddr='8.8.8.8', port=22):
+		self.resolver = dnsResolver.Resolver()
+		self.resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		resolver = dnsResolver.Resolver()
-		resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
-		while not TheEndOfTime:
-			try:
-				answers = dns.resolver.query( randomword() + "." + randomword() + ".com", dns.rdtypes.ANY)
-			except Exception, e:
-				if debug:
-					print 'dns'
-					raise e
-				else:
-					pass
-			delay()
+		answers = dns.resolver.query( randomword() + "." + randomword() + ".com", dns.rdtypes.ANY)
 
 class smb(object):
 	"""docstring for smb"""
@@ -451,19 +367,9 @@ class smb(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		resolver = dnsResolver.Resolver()
-		resolver.nameservers = [str(ipaddr)] #specify the ip address of the nameserver
-		while not TheEndOfTime:
-			try:
-				conn = SMBConnection(randomword(), randomword, randomword, ipaddr, use_ntlm_v2 = True)
-			except Exception, e:
-				if debug:
-					print 'smb'
-					raise e
-				else:
-					pass
-			delay()
+		conn = SMBConnection(randomword(), randomword, randomword, ipaddr, use_ntlm_v2 = True)
 
 class daytime(object):
 	"""docstring for daytime"""
@@ -473,27 +379,17 @@ class daytime(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port))
 		t.start()
 		return t
+	@boilerPlate(self.__class__.__name__)
 	def open(self, ipaddr, port):
-		while not TheEndOfTime:
-			try:
-				s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-				s.connect((ipaddr,port))
-				while True:
-					data = s.recv(10000)
-					if data:
-						pass
-					else:
-						break
-				s.close()
-			except Exception, e:
-				if debug:
-					print 'daytime'
-					raise e
-				else:
-					pass
-			
-			delay()
-		
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.connect((ipaddr,port))
+		while True:
+			data = s.recv(10000)
+			if data:
+				pass
+			else:
+				break
+		s.close()
 
 class generaric(object):
 	"""docstring for generaric"""
@@ -503,6 +399,7 @@ class generaric(object):
 		t = threading.Thread(target=self.open, args=(ipaddr, port, protocol, packetSize))
 		t.start()
 		return t
+	#weird eough case not to get boiler plate
 	def open(self, ipaddr, port, protocol, packetSize):
 		print '*'
 		print protocol
@@ -520,7 +417,6 @@ class generaric(object):
 						print 'TCP'
 						print e
 				delay()
-				
 		else:
 			while not TheEndOfTime:
 				try:
@@ -651,16 +547,11 @@ def remoteControll():
 			time.sleep(10)
 		sys.exit()
 
-
 def main():
-
-
 	if underRemoteControll:
 		remoteControll()
 	else:
 		localControll()
 
-	
 if __name__ == '__main__':
-
 	main()
