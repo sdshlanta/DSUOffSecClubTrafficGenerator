@@ -15,6 +15,3 @@ The following is a listing of command line options
 `-D` tells the program to print debug mesages print debugging messages
 
 `-r` tells the program to wait for instructions from a remote command and controll server.
-
-
-SSH has not been implmented yet because I wrote this on a windows box and paramiko doesn't work on windows.  Will be implmented soon (read probibly never)
