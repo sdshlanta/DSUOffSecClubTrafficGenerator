@@ -268,7 +268,7 @@ class ssh(object):
 	def open(self, ipaddr, port):
 		sshC = paramiko.SSHClient()
 		sshC.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-		sshC.connect(hostname=ipaddr, port=port username=randomword(), password=randomword(8)
+		sshC.connect(hostname=ipaddr, port=port username=randomword(), password=randomword(8))
 		stdin, stdout, stderr = ssh.exec_command('ls')
 		ssh.close()
 
