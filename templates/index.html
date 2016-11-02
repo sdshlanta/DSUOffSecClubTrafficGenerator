@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>NoisyCricket</title>
+</head>
+<body>
+<table border="1">
+	<tr>
+		<th>IP Address</th>
+		<th>Services</th>
+		<th>State</th>
+	</tr>
+	{%for ipaddr, host in context.hosts.iteritems() %}
+	<tr> 
+		<td>{{ ipaddr }}</td>
+		<td>
+			{% for serv in host.host.services %}
+			<strong>{{ serv.service }}</strong>, {{ serv.port }}
+			{% endfor %}
+		</td>
+		<td>
+	{%if host.hostState.paused == false %}
+		<a href="{{url_for('pauseHost')}}?ipaddr={{ipaddr}}">Running</a>
+	{% elif host.hostState.paused == true %}
+		<a href="{{url_for('resumeHost')}}?ipaddr={{ipaddr}}">Paused</a>
+	{%endif%}
+		</td>
+	</tr>
+	{% endfor %}
+</table>
+<br>
+<table>
+	<tr>
+		<td><a href="{{url_for('pauseAll')}}">Pause All</a></td>
+		<td><a href="{{url_for('resumeAll')}}">Resume All</a></td>
+	</tr>
+
+</body>
+</html>
