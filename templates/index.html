@@ -34,6 +34,24 @@
 		<td><a href="{{url_for('pauseAll')}}">Pause All</a></td>
 		<td><a href="{{url_for('resumeAll')}}">Resume All</a></td>
 	</tr>
-
+</table>
+<form action="{{url_for('addHost')}}" method="post">
+	<table>
+		<tr>
+			<td colspan="2">Add Host</td>
+		</tr>
+		<tr>
+			<td>ipaddr</td>
+			<td><input type="text" name="ipaddr"></td>
+		</tr>
+		<tr>
+			<td>flags</td>
+			<td><input type="text" name="flags"></td>
+		</tr>
+		<tr>
+			<td colspan="2"><input type="submit" value="Submit"></td>
+		</tr>
+	</table>
+</form>
 </body>
 </html>

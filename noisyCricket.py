@@ -18,6 +18,7 @@ args = parser.parse_args()
 
 from flask import Flask, render_template, request, session, escape, redirect, url_for, abort
 from libnmap.parser import NmapParser #for parsing nmap for generating the host list
+from libnmap.process import NmapProcess 
 import threading
 from services import *
 from noisyCricketUtil import HostState
@@ -26,6 +27,7 @@ from multiprocessing import Process
 import socket
 
 
+localhost = socket.gethostbyname(socket.gethostname())
 
 app = Flask(__name__)
 hosts = {}
@@ -42,7 +44,9 @@ def pauseHost():
 		hosts[ipaddr].pauseTraffic()
 		return redirect(url_for('home'))
 	except Exception as e:
-		raise e
+		if args.D:
+			print e
+		return redirect(url_for('home'))
 
 @app.route('/api/resumeHost', methods=['GET'])
 def resumeHost():
@@ -52,7 +56,9 @@ def resumeHost():
 		hosts[ipaddr].resumeTraffic()
 		return redirect(url_for('home'))
 	except Exception as e:
-		raise e
+		if args.D:
+			print e
+		return redirect(url_for('home'))
 
 @app.route('/api/pauseAll', methods=['GET'])
 def pauseAll():
@@ -66,14 +72,35 @@ def resumeAll():
 		targetHost.resumeTraffic()
 	return redirect(url_for('home'))
 
+@app.route('/api/addHost', methods=['POST'])
+def addHost():
+		error = None
+		if request.method != 'POST':
+				return redirect(url_for('home'))
+		try:
+			ipaddr = escape(request.form['ipaddr'])
+			flags = escape(request.form['flags'])
+			nm = NmapProcess(ipaddr, options=flags)
+			nm.run()
+			report = NmapParser.parse(nm.stdout)
+			for node in report.hosts:
+				if node.address not in hosts and node.address != localhost:
+					hosts[node.address] = host(host=node, serviceDict=serviceDict, tryFandCConn=args.c, delayFactor=args.d, debug=args.D)
+			for targetHost in hosts.itervalues():
+				targetHost.startTraffic()
+			return redirect(url_for('home'))
+
+		except Exception as e:
+			if args.D:
+				print e
+			return redirect(url_for('home'))
 
 def main():
 	try:
-		localhost = socket.gethostbyname(socket.gethostname())
 		report = NmapParser.parse_fromfile(args.f)
 		for node in report.hosts:
-				if node.address != localhost:
-					hosts[node.address] = host(host=node, serviceDict=serviceDict, tryFandCConn=args.c, delayFactor=args.d, debug=args.D)
+			if node.address != localhost:
+				hosts[node.address] = host(host=node, serviceDict=serviceDict, tryFandCConn=args.c, delayFactor=args.d, debug=args.D)
 		for targetHost in hosts.itervalues():
 			targetHost.startTraffic()
 		app.secret_key = 'Th1S1s@v3ry53cUr3K3y~XHH!jmN'

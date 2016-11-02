@@ -39,7 +39,6 @@ class host(object):
 	def killTraffic(self):
 		self.hostState.running = False
 
-
 class ncThread(object):
 	"""docstring for ncThread"""
 	def __init__(self, hostState):
@@ -87,7 +86,7 @@ def randomword(length=6):
 def justFuckingDie():
 	killCmd = 'kill -9 %s;'
 	killString = ''
-	x = os.popen('ps aux | grep python2.7').read().split('\n')
+	x = os.popen('ps ag | grep python').read().split('\n')
 	for s in x:
 		s=s[1:].strip()
 		try:
@@ -95,3 +94,4 @@ def justFuckingDie():
 		except:
 			continue
 	os.system(killString)
+

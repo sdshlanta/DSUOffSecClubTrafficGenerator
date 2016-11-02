@@ -1,0 +1,9 @@
+python-libnmap
+requests
+beautifulsoup4
+dnspython
+paramiko
+pydhcplib
+pysftp
+tftpy
+pysmb
