@@ -8,10 +8,6 @@ The following is a listing of command line options
 
 `-f <input file>` defines the name the input file currently the program takes the an nmap scan in an xml format (the `-oX` flag in nmap)
 
-`-l <int>` defines how many links the HTTP spiders will follow
-
 `-d <int>` is the maximum time -1 the the program will wait before making another request, the avrage delay is about half the delayFactor (set to 1024 be default)
 
 `-D` tells the program to print debug mesages print debugging messages
-
-`-r` tells the program to wait for instructions from a remote command and controll server.
