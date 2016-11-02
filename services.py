@@ -21,6 +21,7 @@ import smtplib, imaplib, poplib #for smtp imap and pop3, basicly all email
 from pydhcplib.dhcp_packet import * #dhcp
 from pydhcplib.dhcp_network import * #dhcp
 from smb.SMBConnection import SMBConnection
+from nmb.NetBIOS import NetBIOS
 import dns.resolver as dnsResolver # for DNS
 #util
 from email.mime.text import MIMEText
@@ -29,6 +30,8 @@ import random
 import threading
 import warnings
 from noisyCricketUtil import *
+
+random = random.SystemRandom()
 
 class telnet(ncThread): #ncThread is defined in noisyCricketUtil
 	"""docstring for telnet"""
@@ -43,9 +46,9 @@ class telnet(ncThread): #ncThread is defined in noisyCricketUtil
 				try: #start non-boilerplate
 					tn = telnetlib.Telnet(ipaddr, port)
 					tn.read_until("login: ", 2)
-					tn.write("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n") #type some random junk for the username
+					tn.write(randomword()) #type some random junk for the username
 					tn.read_until("Password: ", 2)
-					tn.write(randomword() + "DontBanPlx\n") #type some random junk for the password
+					tn.write(randomword()) #type some random junk for the password
 					#these should never ever ever execute but if the do it does an ls and exits
 					tn.write("ls\n")
 					delay(-1)
@@ -100,8 +103,6 @@ class sftp(ncThread):
 					else:
 						pass
 			delay(self.hostState.delayFactor)
-		connection = pysftp.Connection(ipaddr, port, username='notABruteForce'+randomword(), password='seriouslyThisIsLegit' + randomword())
-		connection.close()
 
 class tftp(ncThread):
 	"""docstring for tftp"""
@@ -273,7 +274,7 @@ class pop3(ncThread):
 			else:
 				try:#start non-boilerplate
 					M = poplib.POP3(ipaddr, port)
-					M.user("le" + randomword(2).lower() + "gi" + randomword(2).lower() + "tU" + randomword(2).lower() + "se" + "r" + "\n")
+					M.user("le%sgi%stU%sse%sr\n" % ( randomword(2).lower(), randomword(2).lower(), randomword(2).lower(), randomword(2).lower()))
 					M.pass_(randomword(6))
 					numMessages = len(M.list()[1])
 					for i in range(numMessages):
@@ -314,7 +315,7 @@ class smtp(object):
 			delay(self.hostState.delayFactor)
 		
 
-class imap(object):
+class imap(ncThread):
 	def open(self, ipaddr, port):
 		print(self.__class__.__name__)
 		while self.hostState.running:
@@ -394,14 +395,8 @@ class dhcp(ncThread):
 						pass
 			delay(self.hostState.delayFactor)
 
-class smb(object):
+class smb(ncThread):
 	"""docstring for smb"""
-	def __init__(self):
-		super(smb, self).__init__()
-	def run(self, ipaddr, port=22):
-		t = threading.Thread(target=self.open, args=(ipaddr, port))
-		t.start()
-		return t
 	def open(self, ipaddr, port):
 		print(self.__class__.__name__)
 		while self.hostState.running:
@@ -411,7 +406,28 @@ class smb(object):
 				delay(self.hostState.delayFactor)
 			else:
 				try:#start non-boilerplate
-					conn = SMBConnection(randomword(), randomword(), randomword(), ipaddr, use_ntlm_v2 = True)
+					conn = SMBConnection(username=randomword(), password=randomword(), my_name=randomword(), remote_name=ipaddr, use_ntlm_v2=True, is_direct_tcp=True)
+					conn.connect(ip=ipaddr, port=port, timeout=self.hostState.delayFactor)
+				except Exception, e:#end non-boilerpla
+					if self.hostState.debug:
+						print('%s, %s: %s' % (ipaddr, self.__class__.__name__, e))
+					else:
+						pass
+			delay(self.hostState.delayFactor)
+
+class netbios(ncThread):
+	"""docstring for sftp"""
+	def open(self, ipaddr, port):
+		nb=NetBIOS(broadcast=False)
+		print(self.__class__.__name__)
+		while self.hostState.running:
+			if self.hostState.paused:
+				if self.hostState.debug:
+					print('%s %s paused' % (ipaddr, self.__class__.__name__))
+				delay(self.hostState.delayFactor)
+			else:
+				try:#start non-boilerplate
+					nb.queryIPForName(ip=ipaddr, port=port, timeout=self.hostState.delayFactor)
 				except Exception, e:#end non-boilerpla
 					if self.hostState.debug:
 						print('%s, %s: %s' % (ipaddr, self.__class__.__name__, e))
@@ -499,8 +515,11 @@ serviceDict = {
 	'imap':imap, #done(?)
 	'dns':dns, #done it is generating traffic (i think... kinda hard to tell tbh...) but needs more testing
 	'smb':smb, 
+	'microsoft-ds':smb,
+	'netbios-ssn':netbios, 
 	'daytime':daytime, #done
 	'generic':generic #done
+
 }
 
 #just Ignore this only here because I'm lazy -_-
