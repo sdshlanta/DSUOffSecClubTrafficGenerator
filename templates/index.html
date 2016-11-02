@@ -15,7 +15,7 @@
 		<td>{{ ipaddr }}</td>
 		<td>
 			{% for serv in host.host.services %}
-			<strong>{{ serv.service }}</strong>, {{ serv.port }}
+			<strong>{{ serv.service }}</strong>:{{ serv.port }}, 
 			{% endfor %}
 		</td>
 		<td>
